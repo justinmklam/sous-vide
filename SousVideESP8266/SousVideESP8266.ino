@@ -44,10 +44,12 @@ void loop()
     DS18B20.requestTemperatures(); 
     temp = DS18B20.getTempCByIndex(0);
 
+    // Construct char buffer to convert float to string
     char t[10];
     char buf[80];
     dtostrf(temp, 4, 1, t);
-    sprintf(buf,"Temp: %s%cC",t, (char)223);
+    sprintf(buf,"Temp: %s%cC",t, (char)223);    // (char)223 is degree symbol
+
     lcd.setCursor(0,1);
     lcd.print(buf);
 
