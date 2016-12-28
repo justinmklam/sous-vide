@@ -14,23 +14,31 @@ Author: Justin Lam
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+#define LCD_ROWS 2
+#define LCD_COLS 16
 #define I2C_ADDR    0x27 // <<----- Add your address here.  Find it from I2C Scanner
-#define SDA_PIN 2
-#define SCL_PIN 14
+#define SDA_PIN 2       // I2C data pin
+#define SCL_PIN 14      // I2C clock pin
+#define RELAY_PIN 5
+#define DEG_SYMBOL (char)223
 
-#define ONE_WIRE_BUS 4  // DS18B20 pin
-OneWire oneWire(ONE_WIRE_BUS);
+#define TEMP_SENSOR_PIN 4  // DS18B20 pin
+OneWire oneWire(TEMP_SENSOR_PIN);
 DallasTemperature DS18B20(&oneWire);
 
-LiquidCrystal_I2C lcd(I2C_ADDR, 16, 2);
+LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
 
 float temp;
+int relay_state = 0;
 
 void setup()
 {
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN,LOW);
+
     Wire.begin(SDA_PIN, SCL_PIN);
 
-    lcd.begin (16,2); //  <<----- My LCD was 16xl2
+    lcd.begin (LCD_COLS,LCD_ROWS); //  <<----- My LCD was 16xl2
     lcd.init();
 
     lcd.backlight();
@@ -48,7 +56,7 @@ void loop()
     char t[10];
     char buf[80];
     dtostrf(temp, 4, 1, t);
-    sprintf(buf,"Temp: %s%cC",t, (char)223);    // (char)223 is degree symbol
+    sprintf(buf,"Temp: %s%cC",t, DEG_SYMBOL);    // (char)223 is degree symbol
 
     lcd.setCursor(0,1);
     lcd.print(buf);
@@ -57,5 +65,9 @@ void loop()
     // lcd.print("Temp: ");
     // lcd.print(temp);
     // lcd.print((char)223);
-    delay(2000);
+
+    digitalWrite(RELAY_PIN, (relay_state) ? HIGH:LOW);
+    relay_state = !relay_state;
+
+    delay(1000);
 }
