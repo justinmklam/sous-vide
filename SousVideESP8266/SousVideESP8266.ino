@@ -28,6 +28,7 @@ Author: Justin Lam
 #define ENCODER_PIN_B 2
 #define ENCODER_STEPS 4 // number of reading increments per detent
 #define DEG_SYMBOL (char)223    // character code for degree symbol for LCD
+#define SAMPLING_FREQ 100
 
 #define TEMP_SENSOR_PIN 4  // DS18B20 pin
 
@@ -50,6 +51,9 @@ int relay_state = 0;
 int32_t oldPosition  = -999;
 // int32_t newPosition = 42;
 
+uint32_t current_millis;
+uint32_t previous_millis = 0;
+
 char buf[40];
 
 void setup() {
@@ -71,7 +75,14 @@ void setup() {
 }
 
 void buttonISR() {
-    buttonPressed = true;
+    static uint32_t last_interrupt_time = 0;
+    uint32_t interrupt_time = millis();
+
+    // If interrupts come faster than 200ms, assume it's a bounce and ignore
+    if (interrupt_time - last_interrupt_time > 200) {
+        buttonPressed = true;
+    }
+    last_interrupt_time = interrupt_time;
 }
 
 void loop() {
@@ -91,63 +102,61 @@ void loop() {
     // lcd.print("Mode: ");
     // lcd.print(mode);
 
-    switch(mode) {
-        case 1: {
-            lcd.print("Set new time");
-            int32_t newPosition = myEnc.read() / ENCODER_STEPS;
+    current_millis = millis();
 
-            // if (newPosition != oldPosition) {
-            oldPosition = newPosition;
-            lcd.setCursor(9,1);
-            // lcd.print("                ");
-            lcd.setCursor(0,1);
-            sprintf(buf,"New time: %d hrs       ",newPosition);
-            lcd.print(buf);
+    if((current_millis - previous_millis ) >= SAMPLING_FREQ) {
 
-        } break;
+        switch(mode) {
+            case 1: {
+                lcd.print("Set new time");
+                int32_t newPosition = myEnc.read() / ENCODER_STEPS;
 
-        case 2: {
-            lcd.print("Set new temp");
-            int32_t newPosition = myEnc.read() / ENCODER_STEPS + defaultTemp;
+                // if (newPosition != oldPosition) {
+                oldPosition = newPosition;
+                lcd.setCursor(9,1);
+                // lcd.print("                ");
+                lcd.setCursor(0,1);
+                sprintf(buf,"New time: %d hrs       ",newPosition);
+                lcd.print(buf);
 
-            // if (newPosition != oldPosition) {
-            oldPosition = newPosition;
-            lcd.setCursor(9,1);
-            // lcd.print("                ");
-            lcd.setCursor(0,1);
-            sprintf(buf,"New temp: %d%cC     ",newPosition, DEG_SYMBOL);
-            lcd.print(buf);
-                // lcd.print("Set temp: ");
-                // lcd.print(newPosition);
-            // }
-        } break;
+            } break;
 
-        default: {
-            DS18B20.requestTemperatures(); 
-            temp = DS18B20.getTempCByIndex(0);
+            case 2: {
+                lcd.print("Set new temp");
+                int32_t newPosition = myEnc.read() / ENCODER_STEPS + defaultTemp;
 
-            // Construct char buffer to convert float to string
-            char t[10];
-            dtostrf(temp, 4, 1, t);
-            sprintf(buf,"T: %s%cC (80%cC)     ",t, DEG_SYMBOL, DEG_SYMBOL); 
+                // if (newPosition != oldPosition) {
+                oldPosition = newPosition;
+                lcd.setCursor(9,1);
+                // lcd.print("                ");
+                lcd.setCursor(0,1);
+                sprintf(buf,"New temp: %d%cC     ",newPosition, DEG_SYMBOL);
+                lcd.print(buf);
+                    // lcd.print("Set temp: ");
+                    // lcd.print(newPosition);
+                // }
+            } break;
 
-            lcd.setCursor(0,0); 
-            lcd.print(buf);
+            default: {
+                DS18B20.requestTemperatures(); 
+                temp = DS18B20.getTempCByIndex(0);
 
-            // lcd.setCursor(0,0);
-            // sprintf(buf,"T: 81.2%cC (80%cC)", DEG_SYMBOL, DEG_SYMBOL);
-            // lcd.print(buf);
-            lcd.setCursor(0,1);
-            lcd.print("Time: 2h32");
-        } break;
+                // Construct char buffer to convert float to string
+                char t[10];
+                dtostrf(temp, 4, 1, t);
+                sprintf(buf,"T: %s%cC (80%cC)     ",t, DEG_SYMBOL, DEG_SYMBOL); 
+
+                lcd.setCursor(0,0); 
+                lcd.print(buf);
+
+                // lcd.setCursor(0,0);
+                // sprintf(buf,"T: 81.2%cC (80%cC)", DEG_SYMBOL, DEG_SYMBOL);
+                // lcd.print(buf);
+                lcd.setCursor(0,1);
+                lcd.print("Time: 2h32");
+            } break;
+        }
+        previous_millis = current_millis;
     }
-    
-
-    // digitalWrite(RELAY_PIN, (relay_state) ? HIGH:LOW);
-    // relay_state = !relay_state;
-
-    // Show encoder on LCD
-    // delay(1000);
-
 
 }
