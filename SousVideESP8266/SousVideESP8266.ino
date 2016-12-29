@@ -26,9 +26,11 @@ Author: Justin Lam
 #define RELAY_PIN 5
 #define ENCODER_PIN_A 13
 #define ENCODER_PIN_B 2
-#define ENCODER_STEPS 4 // number of reading increments per detent
+#define ENCODER_STEPS_TEMP 4 // number of reading increments per detent
+#define ENCODER_STEPS_TIME 0.16
 #define DEG_SYMBOL (char)223    // character code for degree symbol for LCD
 #define SAMPLING_FREQ 100
+#define STARTING_TEMP 80
 
 #define TEMP_SENSOR_PIN 4  // DS18B20 pin
 
@@ -45,21 +47,24 @@ uint8_t buttonState = 0;
 uint8_t mode = 0;
 uint8_t lastButtonState = 0;
 
-int32_t defaultTemp = 80;   // starting temperature on first boot
+// int32_t defaultTemp = 80;   // starting temperature on first boot
 
 float temp;
 int relay_state = 0;
-int32_t oldPosition  = -999;
+// int32_t oldPosition  = -999;
 // int32_t newPosition = 42;
 
 uint32_t current_millis;
 uint32_t previous_millis = 0;
 
-uint32_t temp_offset = 80;
-uint32_t time_offset = 0;
+uint32_t temp_offset;
+uint32_t time_offset;
 
-uint32_t set_time;
-uint32_t set_temp;
+uint32_t raw_time = 0;
+uint32_t set_temp = STARTING_TEMP;
+
+uint16_t set_hr = 0;
+uint16_t set_min = 0;
 
 char buf[40];
 
@@ -92,6 +97,22 @@ void buttonISR() {
     last_interrupt_time = interrupt_time;
 }
 
+uint16_t getTime(char type, float raw_time) {
+    uint16_t hr, min;
+
+    raw_time /= 100;
+    hr = raw_time;      // Extract hours
+
+    min = (raw_time - hr) * 100 * 0.6;  // Extract minutes in 15 min increments
+
+    if(type == 'h') {
+        return hr;
+    }
+    else if (type == 'm') {
+        return min;
+    }
+}
+
 void loop() {
     if(buttonPressed) {
         lcd.clear();
@@ -114,36 +135,42 @@ void loop() {
 
     if((current_millis - previous_millis ) >= SAMPLING_FREQ) {
 
-        switch(mode) {
-            case 1: {
+        switch(mode) { 
+            // Set time
+            case 1: { 
                 static int32_t old_time = 0;
                 if(modeChange) {
-                    time_offset = old_time - myEnc.read() / ENCODER_STEPS;
+                    time_offset = old_time - myEnc.read() / ENCODER_STEPS_TIME;
                     modeChange = false;
                 }
 
                 lcd.print("Set new time");
-                set_time = myEnc.read() / ENCODER_STEPS + time_offset;
+                raw_time = myEnc.read() / ENCODER_STEPS_TIME + time_offset;
 
                 // if (newPosition != oldPosition) {
-                old_time = set_time;
+                old_time = raw_time;
                 // lcd.setCursor(9,1);
                 // lcd.print("                ");
+
+                set_hr = getTime('h', raw_time);
+                set_min = getTime('m', raw_time);
+
                 lcd.setCursor(0,1);
-                sprintf(buf,"New time: %d hrs       ",set_time);
+                sprintf(buf,"New time: %dh%d       ",set_hr,set_min);
                 lcd.print(buf);
             } break;
 
+            // Set temperature
             case 2: {
-                static int32_t old_temp = 80;
+                static int32_t old_temp = STARTING_TEMP;
 
                 if(modeChange) {
-                    temp_offset = old_temp - myEnc.read() / ENCODER_STEPS;
+                    temp_offset = old_temp - myEnc.read() / ENCODER_STEPS_TEMP;
                     modeChange = false;
                 }
 
                 lcd.print("Set new temp");
-                set_temp = myEnc.read() / ENCODER_STEPS + temp_offset;
+                set_temp = myEnc.read() / ENCODER_STEPS_TEMP + temp_offset;
 
                 // if (newPosition != oldPosition) {
                 old_temp = set_temp;
@@ -161,6 +188,7 @@ void loop() {
                 // }
             } break;
 
+            // Live status
             default: {
                 DS18B20.requestTemperatures(); 
                 temp = DS18B20.getTempCByIndex(0);
@@ -177,7 +205,7 @@ void loop() {
                 // sprintf(buf,"T: 81.2%cC (80%cC)", DEG_SYMBOL, DEG_SYMBOL);
                 // lcd.print(buf);
                 lcd.setCursor(0,1);
-                sprintf(buf,"t: 2h42 (%dh00)"      , set_time);
+                sprintf(buf,"t: 2h42 (%dh%d)"      , set_hr,set_min);
                 lcd.print(buf);
             } break;
         }
