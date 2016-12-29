@@ -40,6 +40,7 @@ LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
 Encoder myEnc(ENCODER_PIN_A, ENCODER_PIN_B);
 
 bool buttonPressed = false;
+bool modeChange = false;
 uint8_t buttonState = 0;
 uint8_t mode = 0;
 uint8_t lastButtonState = 0;
@@ -53,6 +54,12 @@ int32_t oldPosition  = -999;
 
 uint32_t current_millis;
 uint32_t previous_millis = 0;
+
+uint32_t temp_offset = 80;
+uint32_t time_offset = 0;
+
+uint32_t set_time;
+uint32_t set_temp;
 
 char buf[40];
 
@@ -96,6 +103,7 @@ void loop() {
         }
 
         buttonPressed = false;
+        modeChange = true;
     }
 
     // lcd.home();
@@ -108,30 +116,46 @@ void loop() {
 
         switch(mode) {
             case 1: {
+                static int32_t old_time = 0;
+                if(modeChange) {
+                    time_offset = old_time - myEnc.read() / ENCODER_STEPS;
+                    modeChange = false;
+                }
+
                 lcd.print("Set new time");
-                int32_t newPosition = myEnc.read() / ENCODER_STEPS;
+                set_time = myEnc.read() / ENCODER_STEPS + time_offset;
 
                 // if (newPosition != oldPosition) {
-                oldPosition = newPosition;
-                lcd.setCursor(9,1);
+                old_time = set_time;
+                // lcd.setCursor(9,1);
                 // lcd.print("                ");
                 lcd.setCursor(0,1);
-                sprintf(buf,"New time: %d hrs       ",newPosition);
+                sprintf(buf,"New time: %d hrs       ",set_time);
                 lcd.print(buf);
-
             } break;
 
             case 2: {
+                static int32_t old_temp = 80;
+
+                if(modeChange) {
+                    temp_offset = old_temp - myEnc.read() / ENCODER_STEPS;
+                    modeChange = false;
+                }
+
                 lcd.print("Set new temp");
-                int32_t newPosition = myEnc.read() / ENCODER_STEPS + defaultTemp;
+                set_temp = myEnc.read() / ENCODER_STEPS + temp_offset;
 
                 // if (newPosition != oldPosition) {
-                oldPosition = newPosition;
+                old_temp = set_temp;
                 lcd.setCursor(9,1);
                 // lcd.print("                ");
                 lcd.setCursor(0,1);
-                sprintf(buf,"New temp: %d%cC     ",newPosition, DEG_SYMBOL);
+                sprintf(buf,"New temp: %d%cC     ",set_temp, DEG_SYMBOL);
                 lcd.print(buf);
+
+                // if(buttonPressed) {
+                //     temp_offset = newPosition;
+                // }
                     // lcd.print("Set temp: ");
                     // lcd.print(newPosition);
                 // }
@@ -144,7 +168,7 @@ void loop() {
                 // Construct char buffer to convert float to string
                 char t[10];
                 dtostrf(temp, 4, 1, t);
-                sprintf(buf,"T: %s%cC (80%cC)     ",t, DEG_SYMBOL, DEG_SYMBOL); 
+                sprintf(buf,"T: %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
 
                 lcd.setCursor(0,0); 
                 lcd.print(buf);
@@ -153,7 +177,8 @@ void loop() {
                 // sprintf(buf,"T: 81.2%cC (80%cC)", DEG_SYMBOL, DEG_SYMBOL);
                 // lcd.print(buf);
                 lcd.setCursor(0,1);
-                lcd.print("Time: 2h32");
+                sprintf(buf,"t: 2h42 (%dh00)"      , set_time);
+                lcd.print(buf);
             } break;
         }
         previous_millis = current_millis;
