@@ -90,7 +90,7 @@ void setup() {
 
     attachInterrupt(BUTTON_PIN, buttonISR, FALLING);
 
-    timer.SetTimer(0,5,0);
+    timer.SetTimer(0,0,0);
     timer.StartTimer();
 }
 
@@ -125,19 +125,12 @@ uint16_t getTime(char type, float raw_time) {
 
 // Read the encoder and return the scaled time
 int32_t readEncoderTime() {
-    int32_t val = myEnc.read() / ENCODER_STEPS_TIME;
-
-    if (val < 0)
-        val = 0;
-
-    return val;
+    return myEnc.read() / ENCODER_STEPS_TIME;
 }
 
 // Read the encoder and return the scaled temperature
 int32_t readEncoderTemp() {
-    int32_t val = myEnc.read() / ENCODER_STEPS_TEMP;
-    
-    return val;
+    return myEnc.read() / ENCODER_STEPS_TEMP;
 }
 
 // Read the temperature sensor
@@ -221,6 +214,25 @@ void monitorStatus() {
 }
 
 void loop() {
+        // Call this every clock cycle
+    timer.RunTimer();
+    timer.StopTimerAt(0,0,0);
+
+    // Change UI mode if button is pressed
+    if(buttonPressed) {
+        lcd.clear();
+        lcd.home();
+        modeUI++;
+
+        // Cycle through the modes
+        if(modeUI > 2) {
+            modeUI = 0;
+        }
+
+        buttonPressed = false;
+        modeChange = true;
+    }
+
     current_millis = millis();
 
     // UI doesn't need to be updated as frequently
@@ -243,24 +255,5 @@ void loop() {
         }
         previous_millis = current_millis;
     }
-
-    // Change UI mode if button is pressed
-    if(buttonPressed) {
-        lcd.clear();
-        lcd.home();
-        modeUI++;
-
-        // Cycle through the modes
-        if(modeUI > 2) {
-            modeUI = 0;
-        }
-
-        buttonPressed = false;
-        modeChange = true;
-    }
-
-    // Call this every clock cycle
-    timer.RunTimer();
-    timer.StopTimerAt(0,0,0);
 
 }

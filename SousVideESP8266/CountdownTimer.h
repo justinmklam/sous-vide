@@ -1,3 +1,16 @@
+/* CountDownTimer.h
+
+Hour, second, minute timer. Modified to run on ESP8266 using millis() instead of micros().
+
+Based on http://playground.arduino.cc/Main/CountDownTimer
+
+Creator: Andrew Mascolo
+Original date: 11/7/2014
+
+Adapted by: Justin lam
+Last edited: 12/29/2016
+*/
+
 #ifndef CountdownTimer_h
 #define CountdownTimer_h
 

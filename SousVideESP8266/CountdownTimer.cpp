@@ -1,3 +1,5 @@
+/* CountDownTimer.cpp */
+
 #include "CountDownTimer.h"
 
 CountDownTimer::CountDownTimer() {
@@ -42,6 +44,7 @@ void CountDownTimer::ResetTimer()
 void CountDownTimer::StartTimer()
 {
   Watch = millis(); // get the initial microseconds at the start of the timer
+  time = millis();
   Stop = false;
   Paused = false;
 }
