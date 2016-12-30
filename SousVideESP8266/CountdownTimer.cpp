@@ -31,6 +31,8 @@ bool CountDownTimer::RunTimer()
      // then increment "time" by duration
       _millis < time ? time = _millis : time += duration; 
     }
+    if (TimeCheck(0,0,0) )
+        Stop = true;
   }
   return !Stop; // return the state of the timer
 }

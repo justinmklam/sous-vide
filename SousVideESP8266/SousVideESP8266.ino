@@ -30,7 +30,7 @@ Author: Justin Lam
 #define ENCODER_STEPS_TIME 0.16
 #define DEG_SYMBOL (char)223    // character code for degree symbol for LCD
 #define REFRESH_RATE_UI 100     // refresh the UI every 100 ms
-#define STARTING_TEMP 80
+#define STARTING_TEMP 65
 #define MAX_TEMP 100
 #define MIN_TEMP 20
 
@@ -45,11 +45,14 @@ Encoder myEnc(ENCODER_PIN_A, ENCODER_PIN_B);
 
 CountDownTimer timer;
 
+bool pauseMode = false;
+bool timerEnd = false;
 bool buttonPressed = false;
 bool modeChange = false;
 // uint8_t buttonState = 0;
 uint8_t modeUI = 0;
 // uint8_t lastButtonState = 0;
+bool backlightOn = true;
 
 // int32_t defaultTemp = 80;   // starting temperature on first boot
 
@@ -76,7 +79,7 @@ char buf[40];
 void setup() {
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     pinMode(RELAY_PIN, OUTPUT);
-    digitalWrite(RELAY_PIN,LOW);
+    digitalWrite(RELAY_PIN,HIGH);   // relay is switched off on HIGH
 
     // Initialize LCD with I2C
     Wire.begin(SDA_PIN, SCL_PIN);
@@ -90,7 +93,7 @@ void setup() {
 
     attachInterrupt(BUTTON_PIN, buttonISR, FALLING);
 
-    timer.SetTimer(0,0,0);
+    timer.SetTimer(0,0,3);
     timer.StartTimer();
 }
 
@@ -155,6 +158,13 @@ void setNewTime() {
     set_hr = getTime('h', raw_time);
     set_min = getTime('m', raw_time);
 
+    if(set_hr == 0 && set_min == 0) {
+        pauseMode = true;
+    }
+    else {
+        pauseMode = false;
+    }
+
     lcd.print("Set new time");
     lcd.setCursor(0,1);
     sprintf(buf,"New time: %dh%d       ",set_hr,set_min);
@@ -184,12 +194,14 @@ void setNewTemp() {
 void monitorStatus() {
     temp_reading = readTempSensor();
 
+    controlTemp(temp_reading, set_temp);
+
     // Construct char buffer to convert float to string
     char t[10];
     dtostrf(temp_reading, 4, 1, t);
 
     // Show temperature status
-    sprintf(buf,"T: %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
+    sprintf(buf,"T| %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
     lcd.setCursor(0,0); 
     lcd.print(buf);
 
@@ -208,15 +220,47 @@ void monitorStatus() {
     }
 
     // Show time status
-    sprintf(buf,"t: %dh%d,%d (%dh%d)    ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds(),set_hr,set_min);
+    sprintf(buf,"t| %d:%d:%d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
     lcd.setCursor(0,1);
     lcd.print(buf);
 }
 
+void controlTemp(float temp_reading, float desired_temp) {
+    if (temp_reading < desired_temp) {
+        digitalWrite(RELAY_PIN,LOW);
+    }
+    else {
+        digitalWrite(RELAY_PIN,HIGH);
+    }
+}
+
+void blinkLCD(uint8_t blink_rate) {
+    static uint32_t current_millis = millis();
+    static uint32_t previous_millis = 0;
+
+    if ((current_millis - previous_millis) >= blink_rate) {
+        if (backlightOn) {
+            lcd.noBacklight();
+            backlightOn = false;
+        }
+        else {
+            lcd.backlight();
+            backlightOn = true;
+        }
+    }
+}
+
 void loop() {
         // Call this every clock cycle
-    timer.RunTimer();
-    timer.StopTimerAt(0,0,0);
+    timerEnd = timer.RunTimer();
+    // timer.StopTimerAt(0,0,0);
+
+    if(!pauseMode && !timerEnd && modeUI == 0) {
+        blinkLCD(500);
+    }
+    else if(!backlightOn) {
+        lcd.backlight();
+    }
 
     // Change UI mode if button is pressed
     if(buttonPressed) {
