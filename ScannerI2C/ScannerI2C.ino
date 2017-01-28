@@ -29,9 +29,12 @@
 
 #include <Wire.h>
 
+#define SDA_PIN 12       // I2C data pin
+#define SCL_PIN 14      // I2C clock pin
+
 void setup()
 {
-  Wire.begin();
+  Wire.begin(SDA_PIN, SCL_PIN);
 
   Serial.begin(9600);
   while (!Serial);             // Leonardo: wait for serial monitor

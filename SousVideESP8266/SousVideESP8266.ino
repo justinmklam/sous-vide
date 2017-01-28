@@ -45,7 +45,7 @@ Author: Justin Lam
 #define DEG_SYMBOL (char)223    // character code for degree symbol for LCD
 #define REFRESH_RATE_UI 100     // refresh the UI every 100 ms
 #define MQTT_PUBLISH_FREQ 15000  // publish data to MQTT every 15 secs
-#define STARTING_TEMP 65
+#define STARTING_TEMP 20
 #define MAX_TEMP 100
 #define MIN_TEMP 20
 
