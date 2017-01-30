@@ -4,20 +4,35 @@ Sous vide slow cooker controller on ESP8266.
 Liquid Crystal Library: https://github.com/marcoschwartz/LiquidCrystal_I2C
 Dallas temperature lib: https://github.com/milesburton/Arduino-Temperature-Control-Library
 OneWire lib: https://github.com/PaulStoffregen/OneWire
+Adafruit_SSD1306: https://github.com/adafruit/Adafruit_SSD1306
+Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library
 
-Date: Tue, 27 Dec 2016
+Date: Sat, 28 Jan 2017
 Author: Justin Lam
 */
 
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+//#include <LiquidCrystal_I2C.h>
+
+// Temperature libs
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
+// Misc libs
 #include <Encoder.h>
 #include "CountdownTimer.h"
+
+// ESP8266 Wifi libs
 #include <ESP8266WiFi.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
+
+// Display libs
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+//#include <Fonts/FreeMono9pt7b.h>   
 
 // Wifi access point
 #define WLAN_SSID       "HouseOfLams-2.4G"
@@ -30,38 +45,46 @@ Author: Justin Lam
 #define AIO_KEY         "e6023bd3c2354a79adeb6b8ea95223cd"
 
 
-#define LCD_COLS 16     // LCD dimensions
-#define LCD_ROWS 2      // LCD dimensions
+//#define LCD_COLS 16     // LCD dimensions
+//#define LCD_ROWS 2      // LCD dimensions
 
-#define I2C_ADDR    0x27 // <<----- Add your address here.  Find it from I2C Scanner
-#define SDA_PIN 12       // I2C data pin
-#define SCL_PIN 14      // I2C clock pin
+//Pin declarations
+#define I2C_ADDR    0x3C // For Kuman 0.96" OLED I2C display.  Find it from I2C Scanner
+#define SDA_PIN 12       // ESP8266 I2C data pin
+#define SCL_PIN 14       // ESP8266 I2C clock pin
 #define BUTTON_PIN 0
-#define RELAY_PIN 5
+#define RELAY_PIN 4
+#define TEMP_SENSOR_PIN 5  // DS18B20 pin
 #define ENCODER_PIN_A 13
 #define ENCODER_PIN_B 2
+
+//Encoder params
 #define ENCODER_STEPS_TEMP 4 // number of reading increments per detent
 #define ENCODER_STEPS_TIME 0.16
-#define DEG_SYMBOL (char)223    // character code for degree symbol for LCD
+
+#define DEG_SYMBOL (char)247    // degree symbol for OLED display
+//#define DEG_SYMBOL {  0xc,0x12,0x12,0xc,0x0,0x0,0x0}
+
 #define REFRESH_RATE_UI 100     // refresh the UI every 100 ms
 #define MQTT_PUBLISH_FREQ 15000  // publish data to MQTT every 15 secs
 #define STARTING_TEMP 20
 #define MAX_TEMP 100
 #define MIN_TEMP 20
 
-#define TEMP_SENSOR_PIN 4  // DS18B20 pin
+#define OLED_RESET 1  // tie to ESP8266 reset btn
+Adafruit_SSD1306 display(OLED_RESET);
 
 OneWire oneWire(TEMP_SENSOR_PIN);
 DallasTemperature DS18B20(&oneWire);
-LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
+//LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
 Encoder myEnc(ENCODER_PIN_A, ENCODER_PIN_B);
 CountDownTimer timer;
 
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
 WiFiClient client;
+
 // Setup the MQTT client
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
-
 Adafruit_MQTT_Publish tempMQTT = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/sous-vide");
 
 bool pauseMode = true;
@@ -124,11 +147,24 @@ void setup() {
 
     // Initialize LCD with I2C
     Wire.begin(SDA_PIN, SCL_PIN);
-    lcd.begin (LCD_COLS,LCD_ROWS); 
-    lcd.init();
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
-    lcd.backlight();
-    lcd.home (); // go home
+    display.display();
+    delay(2000);
+    display.clearDisplay();
+
+    display.setCursor(0,0);
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+//    display.println("Hello, world!");
+//    display.display();
+//    delay(2000);
+//    display.clearDisplay();
+//    lcd.begin (LCD_COLS,LCD_ROWS); 
+//    lcd.init();
+//
+//    lcd.backlight();
+//    lcd.home (); // go home
 
     // lcd.print("ESP8266 SousVide");  
 
@@ -206,10 +242,13 @@ void setNewTime() {
         pauseMode = false;
     }
 
-    lcd.print("Set new time:");
-    lcd.setCursor(0,1);
-    sprintf(buf,"  t = %dh%d               ",set_hr,set_min);
-    lcd.print(buf);
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.println("Set time:\n");
+//    display.setCursor(0,1);
+    sprintf(buf," t = %dh%d               ",set_hr,set_min);
+    display.println(buf);
+    display.display();
 }
 
 // Prompt user to set cooking temperature
@@ -224,11 +263,14 @@ void setNewTemp() {
     
     set_temp = readEncoderTemp() + temp_offset;
     old_temp = set_temp;
-
-    lcd.print("Set new temp:");
-    lcd.setCursor(0,1);
-    sprintf(buf,"  T = %d%cC               ",set_temp, DEG_SYMBOL);
-    lcd.print(buf);
+    
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.println("Set temp:\n");
+//    display.setCursor(0,1);
+    sprintf(buf," T = %d%cC               ",set_temp, DEG_SYMBOL);
+    display.println(buf);
+    display.display();
 }
 
 // Show live cooking temperature and time status
@@ -243,9 +285,13 @@ void monitorStatus() {
     dtostrf(temp_reading, 4, 1, t);
 
     // Show temperature status
-    sprintf(buf,"T  %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
-    lcd.setCursor(0,0); 
-    lcd.print(buf);
+    display.clearDisplay();
+//    sprintf(buf,"T  %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
+    display.setTextSize(5);
+    sprintf(buf,"%s",t, DEG_SYMBOL); 
+    display.setCursor(7,0); 
+    display.println(buf);
+//    display.display();
 
     if(modeChange) {
         static uint32_t prev_hr = 999, prev_min = 999;
@@ -260,11 +306,16 @@ void monitorStatus() {
         }
         modeChange = false;
     }
-
+    display.setCursor(0,50); 
     // Show time status
-    sprintf(buf,"t  %d:%d:%d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
-    lcd.setCursor(0,1);
-    lcd.print(buf);
+    display.setTextSize(2);
+//    sprintf(buf,"\n   (%d%cC)",set_temp, DEG_SYMBOL);
+//    display.println(buf);
+//    display.setTextSize(2);
+    sprintf(buf,"   %d:%d:%d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
+//    display.setCursor(0,6);
+    display.println(buf);
+    display.display();
 }
 
 // PID temperature control
@@ -284,11 +335,11 @@ void blinkLCD(uint8_t blink_rate) {
 
     if ((current_millis - previous_millis) >= blink_rate) {
         if (backlightOn) {
-            lcd.noBacklight();
+            display.invertDisplay(true);
             backlightOn = false;
         }
         else {
-            lcd.backlight();
+            display.invertDisplay(false);
             backlightOn = true;
         }
         previous_millis = current_millis;
@@ -344,13 +395,13 @@ void loop() {
         blinkLCD(100);
     }
     else if(!backlightOn) {
-        lcd.backlight();
+//        display.backlight();
     }
 
     // Change UI mode if button is pressed
     if(buttonPressed) {
-        lcd.clear();
-        lcd.home();
+        display.clearDisplay();
+        display.setCursor(0,0);
         modeUI++;
 
         // Cycle through the modes
