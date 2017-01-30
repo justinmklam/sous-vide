@@ -11,14 +11,16 @@ Date: Sat, 28 Jan 2017
 Author: Justin Lam
 */
 
-#include <Wire.h>
-//#include <LiquidCrystal_I2C.h>
-
+/***********************/
+/****** LIBRARIES ******/
+/***********************/
 // Temperature libs
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
 // Misc libs
+#include <Wire.h>
+
 #include <Encoder.h>
 #include "CountdownTimer.h"
 
@@ -31,9 +33,11 @@ Author: Justin Lam
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-
 //#include <Fonts/FreeMono9pt7b.h>   
 
+/*************************/
+/****** GLOBAL VARS ******/
+/*************************/
 // Wifi access point
 #define WLAN_SSID       "HouseOfLams-2.4G"
 #define WLAN_PASS       "1amfami1y"
@@ -43,10 +47,6 @@ Author: Justin Lam
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
 #define AIO_USERNAME    "justinmklam"
 #define AIO_KEY         "e6023bd3c2354a79adeb6b8ea95223cd"
-
-
-//#define LCD_COLS 16     // LCD dimensions
-//#define LCD_ROWS 2      // LCD dimensions
 
 //Pin declarations
 #define I2C_ADDR    0x3C // For Kuman 0.96" OLED I2C display.  Find it from I2C Scanner
@@ -62,22 +62,30 @@ Author: Justin Lam
 #define ENCODER_STEPS_TEMP 4 // number of reading increments per detent
 #define ENCODER_STEPS_TIME 0.16
 
+// Display stuff
+#define OLED_RESET 1  // tie to ESP8266 reset btn
 #define DEG_SYMBOL (char)247    // degree symbol for OLED display
-//#define DEG_SYMBOL {  0xc,0x12,0x12,0xc,0x0,0x0,0x0}
 
+// Timing intervals
 #define REFRESH_RATE_UI 100     // refresh the UI every 100 ms
 #define MQTT_PUBLISH_FREQ 15000  // publish data to MQTT every 15 secs
+
+// UI stuff
 #define STARTING_TEMP 20
 #define MAX_TEMP 100
 #define MIN_TEMP 20
 
-#define OLED_RESET 1  // tie to ESP8266 reset btn
+// Setup OLED display
 Adafruit_SSD1306 display(OLED_RESET);
 
+// Setup temp sensor
 OneWire oneWire(TEMP_SENSOR_PIN);
 DallasTemperature DS18B20(&oneWire);
-//LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
+
+// Setup encoder
 Encoder myEnc(ENCODER_PIN_A, ENCODER_PIN_B);
+
+// Setup timer
 CountDownTimer timer;
 
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
@@ -91,27 +99,23 @@ bool pauseMode = true;
 bool timerEnd = false;
 bool buttonPressed = false;
 bool modeChange = false;
-// uint8_t buttonState = 0;
 uint8_t modeUI = 0;
-// uint8_t lastButtonState = 0;
 bool backlightOn = true;
-
-// int32_t defaultTemp = 80;   // starting temperature on first boot
 
 float temp_reading;
 int relay_state = 0;
-// int32_t oldPosition  = -999;
-// int32_t newPosition = 42;
 
+// Timing vars
 uint32_t current_millis;
 uint32_t previous_millis = 0;
 
+// Vars to hold previous encoder vals
 uint32_t temp_offset;
 uint32_t time_offset;
 
-uint32_t raw_time = 0;
+// Startup vars
 uint32_t set_temp = STARTING_TEMP;
-
+uint32_t raw_time = 0;
 uint32_t set_hr = 0;
 uint32_t set_min = 0;
 
@@ -141,6 +145,7 @@ void setup() {
     Serial.println("WiFi connected");
     Serial.println("IP address: "); Serial.println(WiFi.localIP());
 
+    // Initialize pins
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN,HIGH);   // relay is switched off on HIGH
@@ -149,45 +154,41 @@ void setup() {
     Wire.begin(SDA_PIN, SCL_PIN);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
+    // Show adafruit splash screen
     display.display();
-    delay(2000);
+    delay(500);
     display.clearDisplay();
 
+    // Initialize display
     display.setCursor(0,0);
     display.setTextSize(2);
     display.setTextColor(WHITE);
-//    display.println("Hello, world!");
-//    display.display();
-//    delay(2000);
-//    display.clearDisplay();
-//    lcd.begin (LCD_COLS,LCD_ROWS); 
-//    lcd.init();
-//
-//    lcd.backlight();
-//    lcd.home (); // go home
-
-    // lcd.print("ESP8266 SousVide");  
 
     attachInterrupt(BUTTON_PIN, buttonISR, FALLING);
 
+    // Initialize timer
     timer.SetTimer(0,0,0);
     timer.StartTimer();
 }
 
-// Handles button press with debouncing
 void buttonISR() {
+    /* 
+     *  Handles button press with debouncing using hardware interrupt
+     */
     static uint32_t last_interrupt_time = 0;
     uint32_t interrupt_time = millis();
-
+    
     // If interrupts come faster than 200ms, assume it's a bounce and ignore
     if (interrupt_time - last_interrupt_time > 200) {
         buttonPressed = true;
     }
     last_interrupt_time = interrupt_time;
 }
-
-// Splits user inputted time to hours and minutes
+ 
 uint16_t getTime(char type, float raw_time) {
+    /*
+     * Splits user inputted time to hours and minutes
+     */
     uint16_t hr, min;
 
     raw_time /= 100;
@@ -203,24 +204,32 @@ uint16_t getTime(char type, float raw_time) {
     }
 }
 
-// Read the encoder and return the scaled time
 int32_t readEncoderTime() {
+    /*
+     * Read the encoder and return the scaled time
+     */
     return myEnc.read() / ENCODER_STEPS_TIME;
 }
 
-// Read the encoder and return the scaled temperature
 int32_t readEncoderTemp() {
+    /*
+     * Read the encoder and return the scaled temperature
+     */
     return myEnc.read() / ENCODER_STEPS_TEMP;
 }
 
-// Read the temperature sensor
 float readTempSensor() {
+    /*
+     * Read the temperature sensor
+     */
     DS18B20.requestTemperatures(); 
     return DS18B20.getTempCByIndex(0);
 }
 
-// Prompt user to set cooking time
 void setNewTime() {
+    /*
+     * Prompt user to set cooking time
+     */
     static int32_t old_time = 0;
 
     // Reset to the previous user value
@@ -245,14 +254,15 @@ void setNewTime() {
     display.clearDisplay();
     display.setCursor(0,0);
     display.println("Set time:\n");
-//    display.setCursor(0,1);
     sprintf(buf," t = %dh%d               ",set_hr,set_min);
     display.println(buf);
     display.display();
 }
 
-// Prompt user to set cooking temperature
 void setNewTemp() {
+    /*
+     * Prompt user to set cooking temperature
+     */
     static int32_t old_temp = STARTING_TEMP;
 
     // Reset to the previous user value
@@ -267,17 +277,19 @@ void setNewTemp() {
     display.clearDisplay();
     display.setCursor(0,0);
     display.println("Set temp:\n");
-//    display.setCursor(0,1);
     sprintf(buf," T = %d%cC               ",set_temp, DEG_SYMBOL);
     display.println(buf);
     display.display();
 }
 
-// Show live cooking temperature and time status
 void monitorStatus() {
+    /*
+     * Show live cooking temperature and time status
+     */
     temp_reading = readTempSensor();
     controlTemp(temp_reading, set_temp);
 
+    // Send temperature reading online
     MQTT_publish(temp_reading);
 
     // Construct char buffer to convert float to string
@@ -286,13 +298,19 @@ void monitorStatus() {
 
     // Show temperature status
     display.clearDisplay();
-//    sprintf(buf,"T  %s%cC (%d%cC)     ",t, DEG_SYMBOL, set_temp, DEG_SYMBOL); 
     display.setTextSize(5);
     sprintf(buf,"%s",t, DEG_SYMBOL); 
     display.setCursor(7,0); 
     display.println(buf);
-//    display.display();
 
+    // Show time status
+    display.setCursor(0,50); 
+    display.setTextSize(2);
+    sprintf(buf," %02d:%02d:%02d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
+    display.println(buf);
+    display.display();
+
+    // Check if user wants to change time/temp settings
     if(modeChange) {
         static uint32_t prev_hr = 999, prev_min = 999;
 
@@ -306,20 +324,12 @@ void monitorStatus() {
         }
         modeChange = false;
     }
-    display.setCursor(0,50); 
-    // Show time status
-    display.setTextSize(2);
-//    sprintf(buf,"\n   (%d%cC)",set_temp, DEG_SYMBOL);
-//    display.println(buf);
-//    display.setTextSize(2);
-    sprintf(buf,"   %d:%d:%d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
-//    display.setCursor(0,6);
-    display.println(buf);
-    display.display();
 }
 
-// PID temperature control
 void controlTemp(float temp_reading, float desired_temp) {
+    /*
+     * "PID" temperature control
+     */
     if (temp_reading < desired_temp) {
         digitalWrite(RELAY_PIN,LOW);
     }
@@ -328,8 +338,10 @@ void controlTemp(float temp_reading, float desired_temp) {
     }
 }
 
-// Flash the LCD backlight when timer is done
 void blinkLCD(uint8_t blink_rate) {
+    /*
+     * Flash the LCD backlight when timer is done
+     */
     uint32_t current_millis = millis();
     static uint32_t previous_millis = 0;
 
@@ -346,8 +358,10 @@ void blinkLCD(uint8_t blink_rate) {
     }
 }
 
-// Publish data through MQTT to Adafruit.io
 void MQTT_publish(float val) {
+    /*
+     * Publish data through MQTT to Adafruit.io
+     */
     uint32_t current_millis = millis();
     static uint32_t previous_millis = 0;
 
@@ -362,6 +376,9 @@ void MQTT_publish(float val) {
 }
 
 void MQTT_connect() {
+  /*
+   * Connect to MQTT
+   */
   int8_t ret;
 
   // Stop if already connected.
@@ -387,9 +404,8 @@ void MQTT_connect() {
 }
 
 void loop() {
-        // Call this every clock cycle
+    // Call this every clock cycle
     timerEnd = timer.RunTimer();
-    // timer.StopTimerAt(0,0,0);
 
     if(!pauseMode && !timerEnd && modeUI == 0) {
         blinkLCD(100);
