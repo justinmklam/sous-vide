@@ -60,7 +60,8 @@ Author: Justin Lam
 
 //Encoder params
 #define ENCODER_STEPS_TEMP 4 // number of reading increments per detent
-#define ENCODER_STEPS_TIME 0.16
+#define ENCODER_STEPS_TIME 0.16 // for 15 min increment
+#define TIME_INCREMENT 15  // encoder time increment
 
 // Display stuff
 #define OLED_RESET 1  // tie to ESP8266 reset btn
@@ -115,7 +116,7 @@ uint32_t time_offset;
 
 // Startup vars
 uint32_t set_temp = STARTING_TEMP;
-uint32_t raw_time = 0;
+int32_t raw_time = 0;
 uint32_t set_hr = 0;
 uint32_t set_min = 0;
 
@@ -127,29 +128,9 @@ char buf[40];
 void MQTT_connect();
 
 void setup() {
-    Serial.begin(115200);
-    delay(10);
-
-    // Connect to WiFi access point.
-    Serial.println(); Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(WLAN_SSID);
-
-    WiFi.begin(WLAN_SSID, WLAN_PASS);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println();
-
-    Serial.println("WiFi connected");
-    Serial.println("IP address: "); Serial.println(WiFi.localIP());
-
-    // Initialize pins
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-    pinMode(RELAY_PIN, OUTPUT);
-    digitalWrite(RELAY_PIN,HIGH);   // relay is switched off on HIGH
-
+//    Serial.begin(115200);
+//    delay(10);
+//
     // Initialize LCD with I2C
     Wire.begin(SDA_PIN, SCL_PIN);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -163,6 +144,30 @@ void setup() {
     display.setCursor(0,0);
     display.setTextSize(2);
     display.setTextColor(WHITE);
+    display.print("Connecting to wifi");
+
+//    // Connect to WiFi access point.
+//    Serial.println(); Serial.println();
+//    Serial.print("Connecting to ");
+//    Serial.println(WLAN_SSID);
+
+
+    WiFi.begin(WLAN_SSID, WLAN_PASS);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(150);
+        display.print(".");
+//        Serial.print(".");
+    }
+    display.print("\nConnected!");
+//    Serial.println();
+//
+//    Serial.println("WiFi connected");
+//    Serial.println("IP address: "); Serial.println(WiFi.localIP());
+
+    // Initialize pins
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN,HIGH);   // relay is switched off on HIGH
 
     attachInterrupt(BUTTON_PIN, buttonISR, FALLING);
 
@@ -208,7 +213,12 @@ int32_t readEncoderTime() {
     /*
      * Read the encoder and return the scaled time
      */
-    return myEnc.read() / ENCODER_STEPS_TIME;
+    float reading;
+    
+    reading = myEnc.read() / ENCODER_STEPS_TIME;
+
+    // Return the rounded multiple
+    return ((reading + TIME_INCREMENT/2) / TIME_INCREMENT) * TIME_INCREMENT;
 }
 
 int32_t readEncoderTemp() {
@@ -226,6 +236,25 @@ float readTempSensor() {
     return DS18B20.getTempCByIndex(0);
 }
 
+uint8_t checkScrollDir(float prev, float curr) {
+    /*
+     * Check encoder scroll direction. Returns true if fwd, false if reverse.
+     */
+     uint8_t dir;
+
+     if( curr > prev ) {
+        dir = 1;   // going forward
+     }
+     else if (prev > curr) {
+        dir = 2;   // going backward
+     }
+     else {
+        dir = 0;   // no change
+     }
+     
+     return dir;
+}
+
 void setNewTime() {
     /*
      * Prompt user to set cooking time
@@ -239,6 +268,10 @@ void setNewTime() {
     }
 
     raw_time = readEncoderTime() + time_offset;
+    
+    if (raw_time < 0) {
+      raw_time = 0;
+    }
     old_time = raw_time;
 
     set_hr = getTime('h', raw_time);
@@ -298,15 +331,24 @@ void monitorStatus() {
 
     // Show temperature status
     display.clearDisplay();
-    display.setTextSize(5);
-    sprintf(buf,"%s",t, DEG_SYMBOL); 
-    display.setCursor(7,0); 
-    display.println(buf);
+    if (temp_reading == -127){
+      display.setCursor(7,0);
+      display.setTextSize(2);
+      display.println("  Insert");
+      display.setCursor(7,18);
+      display.println("   temp");
+    }
+    else {
+      display.setTextSize(5);
+      sprintf(buf,"%s",t, DEG_SYMBOL); 
+      display.setCursor(7,0); 
+      display.println(buf);
+    }
 
     // Show time status
-    display.setCursor(0,50); 
+    display.setCursor(18,50); 
     display.setTextSize(2);
-    sprintf(buf," %02d:%02d:%02d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
+    sprintf(buf,"%02d:%02d:%02d       ",timer.ShowHours(),timer.ShowMinutes(),timer.ShowSeconds());
     display.println(buf);
     display.display();
 
@@ -411,6 +453,7 @@ void loop() {
         blinkLCD(100);
     }
     else if(!backlightOn) {
+        display.invertDisplay(false);
 //        display.backlight();
     }
 
