@@ -137,27 +137,28 @@ void setup() {
 
     // Show adafruit splash screen
     display.display();
-    delay(500);
-    display.clearDisplay();
+    
 
     // Initialize display
     display.setCursor(0,0);
     display.setTextSize(2);
     display.setTextColor(WHITE);
-    display.print("Connecting to wifi");
-
+    
 //    // Connect to WiFi access point.
 //    Serial.println(); Serial.println();
 //    Serial.print("Connecting to ");
 //    Serial.println(WLAN_SSID);
 
-
+    display.clearDisplay();
+    display.print("Connecting to wifi");
     WiFi.begin(WLAN_SSID, WLAN_PASS);
+    
     while (WiFi.status() != WL_CONNECTED) {
         delay(150);
         display.print(".");
 //        Serial.print(".");
     }
+    display.println();
     display.print("\nConnected!");
 //    Serial.println();
 //
@@ -199,7 +200,7 @@ uint16_t getTime(char type, float raw_time) {
     raw_time /= 100;
     hr = raw_time;      // Extract hours
 
-    min = (raw_time - hr) * 100 * 0.6;  // Extract minutes in 15 min increments
+    min = round((raw_time - hr) * 100 * 0.6 / TIME_INCREMENT) * TIME_INCREMENT;  // Extract minutes in 15 min increments
 
     if(type == 'h') {
         return hr;
@@ -218,7 +219,7 @@ int32_t readEncoderTime() {
     reading = myEnc.read() / ENCODER_STEPS_TIME;
 
     // Return the rounded multiple
-    return ((reading + TIME_INCREMENT/2) / TIME_INCREMENT) * TIME_INCREMENT;
+    return reading;
 }
 
 int32_t readEncoderTemp() {
@@ -372,11 +373,14 @@ void controlTemp(float temp_reading, float desired_temp) {
     /*
      * "PID" temperature control
      */
-    if (temp_reading < desired_temp) {
-        digitalWrite(RELAY_PIN,LOW);
+    if(temp_reading == -127) {
+      digitalWrite(RELAY_PIN,HIGH);  // turn off if nothing is inserted
+    }
+    else if (temp_reading < desired_temp) {
+        digitalWrite(RELAY_PIN,LOW);  // turn on the heating element
     }
     else {
-        digitalWrite(RELAY_PIN,HIGH);
+        digitalWrite(RELAY_PIN,HIGH); // turn off the heating element
     }
 }
 
