@@ -7,3 +7,6 @@ Modular temperature controller running on an Arduino-based ESP8266.
 * Adafruit_SSD1306: https://github.com/adafruit/Adafruit_SSD1306
 * Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library
 * Adafruit MQTT
+
+## Further Reading
+Check out [my blog](http://justinmklam.com/projects/elec/sous-vide/) for more info.
