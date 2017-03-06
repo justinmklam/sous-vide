@@ -39,14 +39,14 @@ Author: Justin Lam
 /****** GLOBAL VARS ******/
 /*************************/
 // Wifi access point
-#define WLAN_SSID       "HouseOfLams-2.4G"
-#define WLAN_PASS       "1amfami1y"
+#define WLAN_SSID       "WIFI NAME"
+#define WLAN_PASS       "WIFI PASSWORD"
 
 // Adafruit.io setup
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
-#define AIO_USERNAME    "justinmklam"
-#define AIO_KEY         "e6023bd3c2354a79adeb6b8ea95223cd"
+#define AIO_USERNAME    "ADAFRUIT USERNAME"
+#define AIO_KEY         "ADAFRUIT KEY"
 
 //Pin declarations
 #define I2C_ADDR    0x3C // For Kuman 0.96" OLED I2C display.  Find it from I2C Scanner
