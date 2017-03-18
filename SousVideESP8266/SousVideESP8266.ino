@@ -35,13 +35,14 @@ Author: Justin Lam
 #include <Adafruit_SSD1306.h>
 //#include <Fonts/FreeMono9pt7b.h>   
 
+//needed for wifi autoconnect
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
+
 /*************************/
 /****** GLOBAL VARS ******/
 /*************************/
-// Wifi access point
-#define WLAN_SSID       "WIFI NAME"
-#define WLAN_PASS       "WIFI PASSWORD"
-
 // Adafruit.io setup
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
@@ -154,14 +155,12 @@ void setup() {
     display.setTextColor(WHITE);
 
     // Connect to wifi
-    display.print("Connecting to wifi");
-    WiFi.begin(WLAN_SSID, WLAN_PASS);
-    
-    while (wifi_connect_tries < MAX_WIFI_CONNECT_TRIES || WiFi.status() != WL_CONNECTED) {
-        delay(150);
-        display.print(".");
-        wifi_connect_tries++;
-    }
+    WiFiManager wifiManager;
+    //fetches ssid and pass from eeprom and tries to connect
+    //if it does not connect it starts an access point with the specified name
+    //here  "AutoConnectAP"
+    //and goes into a blocking loop awaiting configuration
+    wifiManager.autoConnect("SousVideAP");
 
     display.println();
 
