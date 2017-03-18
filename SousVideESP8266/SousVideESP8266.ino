@@ -7,7 +7,7 @@ OneWire lib: https://github.com/PaulStoffregen/OneWire
 Adafruit_SSD1306: https://github.com/adafruit/Adafruit_SSD1306
 Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library
 
-Date: Sat, 28 Jan 2017
+Date: Sat, 18 Mar 2017
 Author: Justin Lam
 */
 
@@ -75,7 +75,11 @@ Author: Justin Lam
 #define STARTING_TEMP 20
 #define MAX_TEMP 100
 #define MIN_TEMP 20
+#define MAX_WIFI_CONNECT_TRIES 3
 
+/*************************/
+/****** CLASS INITS ******/
+/*************************/
 // Setup OLED display
 Adafruit_SSD1306 display(OLED_RESET);
 
@@ -96,6 +100,10 @@ WiFiClient client;
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 Adafruit_MQTT_Publish tempMQTT = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/sous-vide");
 
+/******************/
+/****** VARS ******/
+/******************/
+bool offlineMode = false;
 bool pauseMode = true;
 bool timerEnd = false;
 bool buttonPressed = false;
@@ -119,6 +127,7 @@ uint32_t set_temp = STARTING_TEMP;
 int32_t raw_time = 0;
 uint32_t set_hr = 0;
 uint32_t set_min = 0;
+uint8_t wifi_connect_tries = 0;
 
 // Buffer for printing to LCD
 char buf[40];
@@ -137,33 +146,34 @@ void setup() {
 
     // Show adafruit splash screen
     display.display();
-    
+    display.clearDisplay();
 
     // Initialize display
     display.setCursor(0,0);
     display.setTextSize(2);
     display.setTextColor(WHITE);
-    
-//    // Connect to WiFi access point.
-//    Serial.println(); Serial.println();
-//    Serial.print("Connecting to ");
-//    Serial.println(WLAN_SSID);
 
-    display.clearDisplay();
+    // Connect to wifi
     display.print("Connecting to wifi");
     WiFi.begin(WLAN_SSID, WLAN_PASS);
     
-    while (WiFi.status() != WL_CONNECTED) {
+    while (wifi_connect_tries < MAX_WIFI_CONNECT_TRIES || WiFi.status() != WL_CONNECTED) {
         delay(150);
         display.print(".");
-//        Serial.print(".");
+        wifi_connect_tries++;
     }
+
     display.println();
-    display.print("\nConnected!");
-//    Serial.println();
-//
-//    Serial.println("WiFi connected");
-//    Serial.println("IP address: "); Serial.println(WiFi.localIP());
+
+    // Start in offline mode if not connected
+    if(wifi_connect_tries >= MAX_WIFI_CONNECT_TRIES) {
+      offlineMode = true;
+      display.print("\nOffline");
+    }
+    else {
+      display.print("\nConnected!");
+
+    }
 
     // Initialize pins
     pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -324,7 +334,9 @@ void monitorStatus() {
     controlTemp(temp_reading, set_temp);
 
     // Send temperature reading online
-    MQTT_publish(temp_reading);
+    if(!offlineMode) {
+      MQTT_publish(temp_reading);
+    }
 
     // Construct char buffer to convert float to string
     char t[10];
